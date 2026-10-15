@@ -19,6 +19,8 @@ Shader "Hidden/MatrixVision/MatrixSurface"
         float _MatrixSurfaceCellSize; // en mètres
         float _MatrixSurfaceWorldFall; // 1 = code fixe dans le monde, 0 = attaché à l'objet
         float _MatrixSurfaceRim;       // liseré sur la silhouette
+        float4 _MatrixRevealSphere;    // révélation : xyz centre monde, w rayon (négatif = tout est visible)
+        float _MatrixRevealEdge;       // épaisseur du front lumineux de la révélation, en mètres
 
         struct Attributes
         {
@@ -63,6 +65,20 @@ Shader "Hidden/MatrixVision/MatrixSurface"
             return fragEye <= sceneEye * 1.01 + 0.01;
         }
 
+        // Révélation progressive (MatrixReveal) : 0 hors de la sphère, 1 dedans.
+        // front vaut 1 sur le bord intérieur de la sphère et retombe à 0 vers le centre.
+        float MatrixRevealMask(float3 positionWS, out float front)
+        {
+            front = 0.0;
+            if (_MatrixRevealSphere.w < 0.0)
+                return 1.0;
+            float d = distance(positionWS, _MatrixRevealSphere.xyz);
+            if (d > _MatrixRevealSphere.w)
+                return 0.0;
+            front = saturate(1.0 - (_MatrixRevealSphere.w - d) / max(_MatrixRevealEdge, 1e-3));
+            return 1.0;
+        }
+
         // Code sur un plan de la projection triplanaire. uv.y = axe vertical (vers le haut).
         float3 MatrixPlane(float2 uv, float plane)
         {
@@ -94,7 +110,12 @@ Shader "Hidden/MatrixVision/MatrixSurface"
             float3 viewDir = normalize(GetWorldSpaceViewDir(input.positionWS));
             float rim = pow(1.0 - saturate(dot(normalWS, viewDir)), 3.0) * (1.0 - abs(normalWS.y));
 
-            return (code + rim * _MatrixSurfaceRim * _MatrixTrailBrightness * _MatrixColor.rgb) * _MatrixSurfaceIntensity * _MatrixIntensity;
+            // Front de la révélation : une bande qui rayonne comme les têtes de colonne.
+            float front;
+            MatrixRevealMask(input.positionWS, front);
+            float3 frontGlow = front * front * _MatrixHeadBrightness * _MatrixColor.rgb;
+
+            return (code + rim * _MatrixSurfaceRim * _MatrixTrailBrightness * _MatrixColor.rgb + frontGlow) * _MatrixSurfaceIntensity * _MatrixIntensity;
         }
         ENDHLSL
 
@@ -112,7 +133,8 @@ Shader "Hidden/MatrixVision/MatrixSurface"
             half4 FragOverlay(Varyings input) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
-                if (!MatrixVisible(input.positionCS))
+                float front;
+                if (!MatrixVisible(input.positionCS) || MatrixRevealMask(input.positionWS, front) <= 0.0)
                     discard;
                 return half4(MatrixSurfaceColor(input), 0.0);
             }
@@ -133,7 +155,8 @@ Shader "Hidden/MatrixVision/MatrixSurface"
             half4 FragReplace(Varyings input) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
-                if (!MatrixVisible(input.positionCS))
+                float front;
+                if (!MatrixVisible(input.positionCS) || MatrixRevealMask(input.positionWS, front) <= 0.0)
                     discard;
                 float3 baseColor = 0.02 * _MatrixColor.rgb;
                 return half4(baseColor + MatrixSurfaceColor(input), 1.0);

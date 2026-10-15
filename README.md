@@ -30,6 +30,42 @@ Effet « pluie de code » façon Matrix pour Unity 6 (URP), en temps réel :
 | `Assets/MatrixVision/MatrixRain/MatrixSurface.shader` | Code sur les objets (Overlay / Replace) |
 | `Assets/MatrixVision/MatrixRain/MatrixCodeTarget.cs` | Marque un objet pour le mode « objets choisis » |
 | `Assets/MatrixVision/MatrixRain/Editor/MatrixGlyphAtlasBaker.cs` | Menu **MatrixVision → Bake Glyph Atlas** |
+| `Assets/MatrixVision/MatrixRain/MatrixReveal.cs` | Révélation progressive du code sur les objets (sphère qui grandit) |
+| `Assets/MatrixVision/Quest/GameManager.cs` | Manager principal de la quête : une méthode par étape |
+| `Assets/MatrixVision/Quest/IQuestRoom.cs` | Ce que la quête doit savoir de la pièce réelle |
+| `Assets/MatrixVision/Quest/MetaQuestRoom.cs` | Pièce réelle via le Meta XR SDK (MR Utility Kit + passthrough) |
+| `Assets/MatrixVision/Quest/Editor/MetaXrDefine.cs` | Ajoute `MATRIX_META_XR` quand le Meta XR SDK est installé |
+
+## Quête Matrix (Meta Quest 3)
+
+On entre dans l'application en réalité mixte, une table est détectée et deux pilules y apparaissent. On en prend une à la main et on l'amène à la bouche :
+
+- **bleue** : une voix dit « Très bien, je te laisse tranquille » ou « Tu loupes tellement de secrets » ;
+- **rouge** : le code Matrix se dévoile depuis la table, puis sur le sol, les murs et le plafond, jusqu'à recouvrir toute la pièce. Neo apparaît ensuite devant soi, d'abord en code, puis solide, et dit « Tu as fait le bon choix. Ton aventure ne fait que commencer. »
+
+Chaque étape est une méthode du `GameManager` :
+
+| Étape | Méthode |
+|---|---|
+| 0. Base réalité mixte | `SetupMixedReality()` |
+| 1. Détection de la surface plane | `DetectPlaneSurface()` |
+| 2. Les deux pilules | `SpawnPills()` |
+| 3. Le geste « manger » | `WaitForSwallow()` |
+| 4. Branche bleue | `PlayBluePillEnding()` |
+| 5. Branche rouge : la matrice se dévoile | `RevealMatrix()` |
+| 6. Apparition de Neo | `SummonNeo()` |
+| 7. Fin | `FinishQuest()` |
+
+### Mise en place
+
+1. Installer le **Meta XR All-in-One SDK** (avec **MR Utility Kit**) depuis le Package Manager. Le symbole `MATRIX_META_XR` s'ajoute tout seul et active `MetaQuestRoom`.
+2. Dans une scène, ajouter les Building Blocks **Camera Rig**, **Passthrough** et **Hand Tracking**, puis un **MRUK** et un **Effect Mesh** (les surfaces de la pièce reçoivent un maillage, que le code Matrix recouvre).
+3. Créer un objet avec **Game Manager** et **Meta Quest Room**, et un **Matrix Manager** dans la scène.
+4. Créer les prefabs des pilules avec le Building Block **Hand Grab** (Interaction SDK) et les assigner au Game Manager. Sans prefab, des capsules de test sont créées, sans saisie.
+5. Placer Neo dans la scène, désactivé, pieds à l'origine et regard vers +Z, et l'assigner. Assigner les sons (déglutition, répliques bleues, montée de la matrice, réplique de Neo).
+6. Sur le casque : build **Android**, permission d'accès à la scène (`com.oculus.permission.USE_SCENE`, ajoutée par le SDK), pièce scannée une fois dans les paramètres du Quest (Space Setup).
+
+Sans le SDK, ou si aucune table n'est trouvée, un plateau virtuel est posé devant le joueur. Dans l'éditeur, le menu contextuel du Game Manager (en Play) propose **Test : avaler la pilule rouge / bleue**.
 
 ## Licences
 

@@ -114,6 +114,8 @@ namespace MatrixVision.Rendering
             public static readonly int SceneBrightness = Shader.PropertyToID("_MatrixSceneBrightness");
             public static readonly int HeadBrightness = Shader.PropertyToID("_MatrixHeadBrightness");
             public static readonly int TrailBrightness = Shader.PropertyToID("_MatrixTrailBrightness");
+            public static readonly int RevealSphere = Shader.PropertyToID("_MatrixRevealSphere");
+            public static readonly int RevealEdge = Shader.PropertyToID("_MatrixRevealEdge");
         }
 
         // Paramètres partagés par les deux shaders (voir MatrixCommon.hlsl).
@@ -140,6 +142,8 @@ namespace MatrixVision.Rendering
             Shader.SetGlobalFloat(Ids.SurfaceIntensity, s.surfaceIntensity.value);
             Shader.SetGlobalFloat(Ids.SurfaceCellSize, s.surfaceCellSize.value);
             Shader.SetGlobalFloat(Ids.SurfaceWorldFall, s.surfaceWorldFall.value ? 1f : 0f);
+            Shader.SetGlobalVector(Ids.RevealSphere, MatrixReveal.Sphere);
+            Shader.SetGlobalFloat(Ids.RevealEdge, MatrixReveal.Edge);
         }
 
         /// <summary>Pluie plein écran : copie la couleur de la caméra à travers le shader MatrixRain.</summary>
