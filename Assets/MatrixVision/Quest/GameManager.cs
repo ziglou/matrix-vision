@@ -2,6 +2,9 @@ using System.Collections;
 using System.Collections.Generic;
 using MatrixVision.Rendering;
 using UnityEngine;
+#if MATRIX_XRI
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
+#endif
 
 namespace MatrixVision.Quest
 {
@@ -10,8 +13,8 @@ namespace MatrixVision.Quest
     /// 0. <see cref="SetupMixedReality"/> · 1. <see cref="DetectPlaneSurface"/> · 2. <see cref="SpawnPills"/> ·
     /// 3. <see cref="WaitForSwallow"/> · 4. <see cref="PlayBluePillEnding"/> · 5. <see cref="RevealMatrix"/> ·
     /// 6. <see cref="SummonNeo"/> · 7. <see cref="FinishQuest"/>.
-    /// La saisie des pilules à la main vient des composants Hand Grab (Interaction SDK) de leurs prefabs :
-    /// le manager regarde seulement si une pilule arrive à la bouche.
+    /// La saisie des pilules à la main vient du XR Grab Interactable (XR Interaction Toolkit) de leurs prefabs,
+    /// ajouté d'office aux pilules de test : le manager regarde seulement si une pilule arrive à la bouche.
     /// </summary>
     [DisallowMultipleComponent]
     [AddComponentMenu("MatrixVision/Game Manager")]
@@ -26,7 +29,7 @@ namespace MatrixVision.Quest
         [Tooltip("Matrix Manager de la scène : l'effet est coupé au départ et piloté par la quête.")]
         [SerializeField] MatrixManager matrixManager;
 
-        [Tooltip("Composant qui implémente IQuestRoom (MetaQuestRoom). Vide : cherché sur cet objet.")]
+        [Tooltip("Composant qui implémente IQuestRoom (ArQuestRoom). Vide : cherché sur cet objet.")]
         [SerializeField] MonoBehaviour roomSource;
 
         [Header("1. Surface plane")]
@@ -45,7 +48,7 @@ namespace MatrixVision.Quest
         [Tooltip("Hauteur du plateau virtuel sous la tête, en mètres (environ la taille).")]
         [SerializeField] float fallbackTableDrop = 0.55f;
 
-        [Tooltip("Surfaces utilisées sans Meta XR SDK (test dans l'éditeur avec une fausse pièce).")]
+        [Tooltip("Surfaces utilisées sans AR Foundation (test dans l'éditeur avec une fausse pièce).")]
         [SerializeField] GameObject[] fallbackSurfaces = new GameObject[0];
 
         [Header("2. Pilules")]
@@ -190,7 +193,7 @@ namespace MatrixVision.Quest
 
         /// <summary>
         /// Étape 0. Passthrough visible et effet Matrix coupé : on doit voir sa pièce et ses mains.
-        /// Le Camera Rig, le Passthrough et le Hand Tracking viennent des Building Blocks du Meta XR SDK.
+        /// Le XR Origin, le passthrough (Unity OpenXR: Meta) et le suivi des mains (XR Hands) viennent de la scène.
         /// </summary>
         public void SetupMixedReality()
         {
@@ -210,7 +213,7 @@ namespace MatrixVision.Quest
                 matrixManager.MatrixEnabled = false;
 
             if (room == null)
-                Debug.Log("GameManager : pas de pièce réelle (Meta XR SDK absent), mode test éditeur.");
+                Debug.Log("GameManager : pas de pièce réelle (AR Foundation absent), mode test éditeur.");
         }
 
         // ---------------------------------------------------------------------------------------
@@ -261,7 +264,7 @@ namespace MatrixVision.Quest
 
         /// <summary>
         /// Étape 2. Pose la pilule rouge à gauche et la bleue à droite sur la surface, face au joueur.
-        /// Les prefabs portent la saisie à la main (Hand Grab de l'Interaction SDK) et leur pulsation lumineuse.
+        /// Les prefabs portent la saisie à la main (XR Grab Interactable) et leur pulsation lumineuse.
         /// </summary>
         public void SpawnPills()
         {
@@ -486,11 +489,23 @@ namespace MatrixVision.Quest
             }
             else
             {
-                // Pilule de test : une capsule couchée, sans saisie à la main.
+                // Pilule de test : une capsule couchée de 2 cm de long, lumineuse.
                 pill = GameObject.CreatePrimitive(PrimitiveType.Capsule);
                 pill.transform.SetPositionAndRotation(position, rotation * Quaternion.Euler(0f, 0f, 90f));
-                pill.transform.localScale = new Vector3(0.02f, 0.02f, 0.02f);
-                pill.GetComponent<Renderer>().material.color = color;
+                pill.transform.localScale = new Vector3(0.012f, 0.01f, 0.012f);
+                var material = pill.GetComponent<Renderer>().material;
+                material.color = color;
+                material.EnableKeyword("_EMISSION");
+                material.SetColor("_EmissionColor", color * 0.6f);
+#if MATRIX_XRI
+                // Saisissable à la main ou à la manette. Sans gravité : lâchée, elle reste en l'air.
+                var body = pill.AddComponent<Rigidbody>();
+                body.useGravity = false;
+                body.isKinematic = true;
+                var grab = pill.AddComponent<XRGrabInteractable>();
+                grab.movementType = XRBaseInteractable.MovementType.Instantaneous;
+                grab.throwOnDetach = false;
+#endif
             }
             pill.name = name;
             return pill;

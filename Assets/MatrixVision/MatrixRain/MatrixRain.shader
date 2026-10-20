@@ -59,7 +59,10 @@ Shader "Hidden/MatrixVision/MatrixRain"
                 float3 tinted = _MatrixSceneBrightness * luma * _MatrixColor.rgb / max(max(_MatrixColor.r, _MatrixColor.g), max(_MatrixColor.b, 1e-4));
                 float3 color = lerp(scene.rgb, tinted, _MatrixSceneTint * _MatrixIntensity) + rain * _MatrixIntensity;
 
-                return half4(color, scene.a);
+                // En réalité mixte, le fond est transparent (alpha 0) et laisse voir le passthrough :
+                // la pluie y rend l'image opaque pour rester visible par-dessus la pièce réelle.
+                float rainAlpha = saturate(max(max(rain.r, rain.g), rain.b) * _MatrixIntensity);
+                return half4(color, max(scene.a, rainAlpha));
             }
             ENDHLSL
         }

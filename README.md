@@ -33,8 +33,9 @@ Effet « pluie de code » façon Matrix pour Unity 6 (URP), en temps réel :
 | `Assets/MatrixVision/MatrixRain/MatrixReveal.cs` | Révélation progressive du code sur les objets (sphère qui grandit) |
 | `Assets/MatrixVision/Quest/GameManager.cs` | Manager principal de la quête : une méthode par étape |
 | `Assets/MatrixVision/Quest/IQuestRoom.cs` | Ce que la quête doit savoir de la pièce réelle |
-| `Assets/MatrixVision/Quest/MetaQuestRoom.cs` | Pièce réelle via le Meta XR SDK (MR Utility Kit + passthrough) |
-| `Assets/MatrixVision/Quest/Editor/MetaXrDefine.cs` | Ajoute `MATRIX_META_XR` quand le Meta XR SDK est installé |
+| `Assets/MatrixVision/Quest/ArQuestRoom.cs` | Pièce réelle via OpenXR et AR Foundation (plans, maillage de la pièce, passthrough) |
+| `Assets/MatrixVision/Quest/Editor/XrDefines.cs` | Ajoute `MATRIX_AR_FOUNDATION` et `MATRIX_XRI` selon les paquets installés |
+| `Assets/MatrixVision/MatrixRain/MatrixRoomOccluder.shader` | Surfaces réelles invisibles mais occultantes (le virtuel passe derrière la vraie table) |
 
 ## Quête Matrix (Meta Quest 3)
 
@@ -56,16 +57,18 @@ Chaque étape est une méthode du `GameManager` :
 | 6. Apparition de Neo | `SummonNeo()` |
 | 7. Fin | `FinishQuest()` |
 
-### Mise en place
+### Mise en place (OpenXR)
 
-1. Installer le **Meta XR All-in-One SDK** (avec **MR Utility Kit**) depuis le Package Manager. Le symbole `MATRIX_META_XR` s'ajoute tout seul et active `MetaQuestRoom`.
-2. Dans une scène, ajouter les Building Blocks **Camera Rig**, **Passthrough** et **Hand Tracking**, puis un **MRUK** et un **Effect Mesh** (les surfaces de la pièce reçoivent un maillage, que le code Matrix recouvre).
-3. Créer un objet avec **Game Manager** et **Meta Quest Room**, et un **Matrix Manager** dans la scène.
-4. Créer les prefabs des pilules avec le Building Block **Hand Grab** (Interaction SDK) et les assigner au Game Manager. Sans prefab, des capsules de test sont créées, sans saisie.
-5. Placer Neo dans la scène, désactivé, pieds à l'origine et regard vers +Z, et l'assigner. Assigner les sons (déglutition, répliques bleues, montée de la matrice, réplique de Neo).
-6. Sur le casque : build **Android**, permission d'accès à la scène (`com.oculus.permission.USE_SCENE`, ajoutée par le SDK), pièce scannée une fois dans les paramètres du Quest (Space Setup).
+1. Paquets : **OpenXR Plugin**, **Unity OpenXR: Meta** (`com.unity.xr.meta-openxr`, apporte AR Foundation), **XR Hands** et **XR Interaction Toolkit**. Les symboles `MATRIX_AR_FOUNDATION` et `MATRIX_XRI` s'ajoutent tout seuls.
+2. **Project Settings → XR Plug-in Management → OpenXR (Android)** : cocher **Meta Quest Support**, **Meta Quest: Camera (Passthrough)**, **Meta Quest: Planes**, **Meta Quest: Session**, **Hand Tracking Subsystem**, et **Meta Quest: Meshing** pour couvrir aussi les meubles.
+3. Dans la scène (Hands Demo Scene) : un **AR Session**, et sur le XR Origin un **AR Plane Manager** (et un **AR Mesh Manager** en option). Sur la Main Camera : **AR Camera Manager**, fond **Solid Color** noir à alpha 0.
+4. Créer un objet avec **Game Manager** et **AR Quest Room** (assigner le shader *MatrixVision/Room Occluder*), et un **Matrix Manager** dans la scène.
+5. Pilules : des prefabs avec **XR Grab Interactable**, ou rien et des capsules saisissables sont créées.
+6. Placer Neo dans la scène, désactivé, pieds à l'origine et regard vers +Z, et l'assigner. Assigner les sons (déglutition, répliques bleues, montée de la matrice, réplique de Neo).
+7. URP (asset utilisé sur Android) : **Alpha Processing** activé, sinon le post-process rend le fond opaque et le passthrough devient noir ; MSAA 4x.
+8. Sur le casque : build **Android**, pièce scannée une fois dans les paramètres du Quest (Space Setup), permission de scène acceptée au lancement.
 
-Sans le SDK, ou si aucune table n'est trouvée, un plateau virtuel est posé devant le joueur. Dans l'éditeur, le menu contextuel du Game Manager (en Play) propose **Test : avaler la pilule rouge / bleue**.
+Sans AR Foundation, ou si aucune table n'est trouvée, un plateau virtuel est posé devant le joueur. Dans l'éditeur, le menu contextuel du Game Manager (en Play) propose **Test : avaler la pilule rouge / bleue**.
 
 ## Licences
 

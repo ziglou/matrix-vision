@@ -5,7 +5,7 @@ namespace MatrixVision.Quest
 {
     /// <summary>
     /// Ce que le <see cref="GameManager"/> doit savoir de la pièce réelle.
-    /// Implémenté par MetaQuestRoom quand le Meta XR SDK est installé ;
+    /// Implémenté par ArQuestRoom quand AR Foundation (OpenXR) est installé ;
     /// sans implémentation, le GameManager se replie sur un plateau virtuel et sur ses surfaces de repli.
     /// </summary>
     public interface IQuestRoom
