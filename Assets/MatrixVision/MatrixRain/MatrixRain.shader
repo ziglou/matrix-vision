@@ -20,6 +20,7 @@ Shader "Hidden/MatrixVision/MatrixRain"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
             #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
             #include "MatrixCommon.hlsl"
+            #include "MatrixEnvironmentDepth.hlsl"
 
             float _MatrixCellSize;            // taille d'une cellule en pixels
             float _MatrixSceneTint;           // 0 = scène d'origine, 1 = scène monochrome verte
@@ -27,6 +28,7 @@ Shader "Hidden/MatrixVision/MatrixRain"
             float _MatrixScreenRain;           // 0 = pas de lettres au premier plan (teinte seule)
             float _MatrixDepthLayers;          // 1 = plans lointain et proche en plus du plan principal
             float _MatrixSceneBrightness;      // luminosité de la scène teintée
+            float _MatrixEnvCodeActive;        // 1 = le code sur l'environnement réel (AR) est dessiné
 
             half4 Frag(Varyings input) : SV_Target
             {
@@ -52,6 +54,9 @@ Shader "Hidden/MatrixVision/MatrixRain"
                 #else
                 bool isSky = SampleSceneDepth(uv) >= 1.0;
                 #endif
+                // En AR, une surface réelle à portée compte comme de la géométrie : elle reçoit son propre code.
+                if (_MatrixEnvCodeActive > 0.5 && MatrixEnvHasSurface(MatrixEnvDepth(uv)))
+                    isSky = false;
                 rain *= (isSky ? 1.0 : _MatrixBackgroundOnGeometry) * _MatrixScreenRain;
 
                 // Scène monochrome verte et assombrie, pour que la pluie ressorte.

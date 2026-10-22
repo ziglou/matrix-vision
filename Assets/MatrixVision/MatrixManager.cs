@@ -36,6 +36,24 @@ namespace MatrixVision
         [Tooltip("« Vision de Neo » : les objets deviennent noir-vert, uniquement du code.")]
         [SerializeField] bool neoVision;
 
+        [Header("Réalité augmentée")]
+        [Tooltip("Les objets réels placés devant un plan masquent son code (profondeur ARCore).")]
+        [SerializeField] bool occlusion = true;
+
+        [Tooltip("Vague de balayage qui révèle le code au premier plan détecté ; un appui en relance une.")]
+        [SerializeField] bool scanWave = true;
+
+        [Tooltip("Expérimental : code sur tout l'environnement réel (objets compris) depuis la profondeur ARCore, " +
+                 "au lieu des seuls plans détectés. Moins propre : lettres instables sur les objets.")]
+        [SerializeField] bool realWorldCode;
+
+        [Header("Neo")]
+        [Tooltip("Le personnage apparaît devant soi quelques secondes après le lancement (MatrixNeoSpawner).")]
+        [SerializeField] bool neoEnabled = true;
+
+        [Tooltip("Le personnage reste entièrement fait de code. Désactivé : le code le matérialise puis s'estompe.")]
+        [SerializeField] bool neoAsCode;
+
         [Header("Lueur")]
         [Tooltip("Bloom réglé pour faire rayonner les têtes de colonne. Désactivé : Bloom du profil de la scène.")]
         [SerializeField] bool glow = true;
@@ -55,6 +73,11 @@ namespace MatrixVision
         public bool AllObjects { get => allObjects; set { allObjects = value; Apply(); } }
         public bool NeoVision { get => neoVision; set { neoVision = value; Apply(); } }
         public bool Glow { get => glow; set { glow = value; Apply(); } }
+        public bool RealWorldCode { get => realWorldCode; set { realWorldCode = value; Apply(); } }
+        public bool Occlusion { get => occlusion; set { occlusion = value; Apply(); } }
+        public bool ScanWave { get => scanWave; set { scanWave = value; Apply(); } }
+        public bool NeoEnabled { get => neoEnabled; set => neoEnabled = value; }
+        public bool NeoAsCode { get => neoAsCode; set => neoAsCode = value; }
 
         void OnEnable()
         {
@@ -99,12 +122,15 @@ namespace MatrixVision
             Force(overrides.surfaceCode, surfaceCode);
             Force(overrides.surfaceAllObjects, allObjects);
             Force(overrides.surfaceReplace, neoVision);
+            Force(overrides.realWorldCode, realWorldCode);
+            Force(overrides.occlusion, occlusion);
+            Force(overrides.scanWave, scanWave);
 
             // Teinte active : on laisse la valeur du profil de la scène.
             overrides.sceneTint.overrideState = !sceneTint;
             overrides.sceneTint.value = 0f;
 
-            // Seuil sous 1 : seules les têtes HDR et les glyphes illuminés rayonnent, pas la scène.
+            // Seuil au-dessus de 1 : seules les têtes HDR et les glyphes illuminés rayonnent, pas la scène.
             bool bloomOn = matrixEnabled && glow;
             bloom.active = bloomOn;
             bloom.intensity.overrideState = bloomOn;

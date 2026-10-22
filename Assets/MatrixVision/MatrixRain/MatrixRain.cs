@@ -81,6 +81,33 @@ namespace MatrixVision.Rendering
         [Tooltip("Code fixe dans le monde (les objets le traversent) au lieu d'être attaché à l'objet.")]
         public BoolParameter surfaceWorldFall = new(false);
 
+        [Header("Réalité augmentée")]
+        [Tooltip("Expérimental : code sur tout l'environnement réel filmé, reconstruit pixel par pixel depuis la profondeur " +
+                 "ARCore, à la place des plans détectés. Couvre les objets, mais la profondeur basse résolution rend les " +
+                 "lettres instables. Sans effet hors AR ou sur un téléphone sans profondeur.")]
+        public BoolParameter realWorldCode = new(false);
+
+        [Tooltip("Distance maximale, en mètres, du code sur l'environnement réel (au-delà, la profondeur est peu fiable).")]
+        public ClampedFloatParameter realWorldMaxDistance = new(6f, 1f, 20f);
+
+        [Tooltip("Les objets réels placés devant un plan (chaise devant un mur…) masquent son code. " +
+                 "Nécessite la profondeur ARCore ; sans effet sinon.")]
+        public BoolParameter occlusion = new(true);
+
+        [Tooltip("Vague de balayage : au premier plan détecté, une onde part du téléphone et révèle le code ; " +
+                 "un appui sur l'écran en relance une (lueur seule).")]
+        public BoolParameter scanWave = new(true);
+
+        [Tooltip("Casque (Meta Quest) : voile sombre et vert posé sur le passthrough, que l'application ne peut pas " +
+                 "teinter directement. 0 = passthrough intact, 1 = noir complet. Nécessite le mode XR léger.")]
+        public ClampedFloatParameter passthroughDim = new(0f, 0f, 1f);
+
+        [Tooltip("Vitesse de la vague, en mètres par seconde.")]
+        public ClampedFloatParameter scanWaveSpeed = new(3.5f, 0.5f, 10f);
+
+        [Tooltip("Portée de la vague, en mètres.")]
+        public ClampedFloatParameter scanWaveDistance = new(8f, 2f, 30f);
+
         public bool IsActive() => intensity.value > 0f;
     }
 }

@@ -26,7 +26,8 @@ MonoBehaviour:
     probeVolumeBlendStatesCS: {fileID: 0}
   m_RendererFeatures:
   - {fileID: 4400180446837976881}
-  m_RendererFeatureMap: 31af65a1cd94103d
+  - {fileID: 3768335004926837707}
+  m_RendererFeatureMap: 31af65a1cd94103dcb8355b3b8d04b34
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -55,6 +56,19 @@ MonoBehaviour:
   m_DepthTextureFormat: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 0
+--- !u!114 &3768335004926837707
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ae4d376c05df421b98c5b39b25b0d29, type: 3}
+  m_Name: ARBackground
+  m_EditorClassIdentifier: Unity.XR.ARFoundation::UnityEngine.XR.ARFoundation.ARBackgroundRendererFeature
+  m_Active: 1
 --- !u!114 &4400180446837976881
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -70,5 +84,8 @@ MonoBehaviour:
   m_Active: 1
   shader: {fileID: 4800000, guid: a5bccbf9d338f264e9cf5172752b6b99, type: 3}
   surfaceShader: {fileID: 4800000, guid: 284734c5866d41c4f9c95058809b506a, type: 3}
+  environmentShader: {fileID: 4800000, guid: eebb6e0990a6aa34190b87fe05bf0dde, type: 3}
+  passthroughDimShader: {fileID: 4800000, guid: 7797960c1bb4b7a40a96151ffc58055b, type: 3}
+  lightweightXR: 0
   glyphAtlas: {fileID: 2800000, guid: 09ec4692a202357498aab661a8b13bfc, type: 3}
   injectionPoint: 550

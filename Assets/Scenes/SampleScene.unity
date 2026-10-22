@@ -529,7 +529,7 @@ MonoBehaviour:
   priority: 0
   blendDistance: 0
   weight: 1
-  sharedProfile: {fileID: 11400000, guid: 10fc4df2da32a41aaa32d77bc913491c, type: 2}
+  sharedProfile: {fileID: 11400000, guid: 269362fd717c1584890ffe8ea58adb45, type: 2}
 --- !u!4 &832575519
 Transform:
   m_ObjectHideFlags: 0
@@ -739,6 +739,11 @@ MonoBehaviour:
   surfaceCode: 1
   allObjects: 1
   neoVision: 0
+  occlusion: 1
+  scanWave: 1
+  realWorldCode: 0
+  neoEnabled: 1
+  neoAsCode: 0
   glow: 1
   glowIntensity: 1.5
 --- !u!1 &1778472872

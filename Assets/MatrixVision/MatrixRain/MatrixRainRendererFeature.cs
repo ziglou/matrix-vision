@@ -7,16 +7,25 @@ using UnityEngine.Rendering.Universal;
 namespace MatrixVision.Rendering
 {
     /// <summary>
-    /// Effet Matrix en deux passes Render Graph, actives quand l'override <see cref="MatrixRain"/> l'est :
-    /// pluie plein écran (atténuée sur la géométrie), puis code qui épouse les objets.
+    /// Effet Matrix en passes Render Graph, actives quand l'override <see cref="MatrixRain"/> l'est :
+    /// pluie plein écran (atténuée sur la géométrie), code sur l'environnement réel (AR, si la
+    /// profondeur est disponible), puis code qui épouse les objets.
     /// </summary>
     public sealed class MatrixRainRendererFeature : ScriptableRendererFeature
     {
         const string RainShaderName = "Hidden/MatrixVision/MatrixRain";
         const string SurfaceShaderName = "Hidden/MatrixVision/MatrixSurface";
+        const string EnvironmentShaderName = "Hidden/MatrixVision/MatrixEnvironment";
+        const string PassthroughDimShaderName = "Hidden/MatrixVision/MatrixPassthroughDim";
 
         [SerializeField] Shader shader;
         [SerializeField] Shader surfaceShader;
+        [SerializeField] Shader environmentShader;
+        [SerializeField] Shader passthroughDimShader;
+        [Tooltip("Casques en réalité mixte (Meta Quest) : pas de texture intermédiaire ni de copie de profondeur " +
+                 "(performances du passthrough). Seuls le voile sur le passthrough et le code des surfaces sont dessinés, " +
+                 "directement à l'écran ; pas de pluie plein écran ni de teinte de l'image.")]
+        [SerializeField] bool lightweightXR;
         [Tooltip("Atlas SDF 8x8 des glyphes (menu MatrixVision > Bake Glyph Atlas).")]
         [SerializeField] Texture2D glyphAtlas;
         [Tooltip("Avant le post-process d'URP : les têtes de colonne HDR rayonnent grâce au Bloom. " +
@@ -25,7 +34,11 @@ namespace MatrixVision.Rendering
 
         Material material;
         Material surfaceMaterial;
+        Material environmentMaterial;
+        Material passthroughDimMaterial;
         MatrixRainPass pass;
+        MatrixEnvironmentPass environmentPass;
+        MatrixPassthroughDimPass passthroughDimPass;
         MatrixSurfacePass surfacePass;
         bool warnedMissingAtlas;
 
@@ -35,7 +48,11 @@ namespace MatrixVision.Rendering
                 shader = Shader.Find(RainShaderName);
             if (surfaceShader == null)
                 surfaceShader = Shader.Find(SurfaceShaderName);
-            if (shader == null || surfaceShader == null)
+            if (environmentShader == null)
+                environmentShader = Shader.Find(EnvironmentShaderName);
+            if (passthroughDimShader == null)
+                passthroughDimShader = Shader.Find(PassthroughDimShaderName);
+            if (shader == null || surfaceShader == null || environmentShader == null || passthroughDimShader == null)
             {
                 Debug.LogWarning("MatrixRainRendererFeature : shaders Matrix introuvables.");
                 return;
@@ -43,9 +60,15 @@ namespace MatrixVision.Rendering
 
             material = CoreUtils.CreateEngineMaterial(shader);
             surfaceMaterial = CoreUtils.CreateEngineMaterial(surfaceShader);
+            environmentMaterial = CoreUtils.CreateEngineMaterial(environmentShader);
+            passthroughDimMaterial = CoreUtils.CreateEngineMaterial(passthroughDimShader);
+            // Mode XR léger : pas de copie de profondeur, donc test de profondeur matériel (surfaces cachées masquées).
+            surfaceMaterial.SetFloat("_MatrixZTest", (float)(lightweightXR ? CompareFunction.LessEqual : CompareFunction.Always));
             pass = new MatrixRainPass(material) { renderPassEvent = injectionPoint };
-            // Juste après la pluie plein écran, pour que la teinte de la scène ne recolore pas le code des objets.
-            surfacePass = new MatrixSurfacePass(surfaceMaterial) { renderPassEvent = injectionPoint + 1 };
+            // Après la pluie plein écran (ou le voile), pour que la teinte ne recolore pas le code.
+            environmentPass = new MatrixEnvironmentPass(environmentMaterial) { renderPassEvent = injectionPoint + 1 };
+            passthroughDimPass = new MatrixPassthroughDimPass(passthroughDimMaterial) { renderPassEvent = injectionPoint + 1 };
+            surfacePass = new MatrixSurfacePass(surfaceMaterial, lightweightXR) { renderPassEvent = injectionPoint + 2 };
         }
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
@@ -68,11 +91,33 @@ namespace MatrixVision.Rendering
             }
 
             bool surfaceActive = settings.surfaceCode.value && settings.surfaceIntensity.value > 0f;
-            PushGlobals(settings, surfaceActive);
+            Shader.SetGlobalFloat(Ids.SkipSceneDepth, lightweightXR ? 1f : 0f);
+
+            if (lightweightXR)
+            {
+                PushGlobals(settings, surfaceActive, false);
+                if (settings.passthroughDim.value > 0f)
+                    renderer.EnqueuePass(passthroughDimPass);
+                if (surfaceActive)
+                {
+                    surfacePass.Setup(settings.surfaceReplace.value ? 1 : 0,
+                        settings.surfaceAllObjects.value ? uint.MaxValue : MatrixCodeTarget.RenderingLayerBit);
+                    renderer.EnqueuePass(surfacePass);
+                }
+                return;
+            }
+
+            // Profondeur de l'environnement réel : publiée chaque frame par MatrixARController (AR uniquement).
+            bool environmentActive = surfaceActive && settings.realWorldCode.value &&
+                Shader.GetGlobalFloat(Ids.EnvDepthAvailable) > 0.5f;
+            PushGlobals(settings, surfaceActive, environmentActive);
 
             // La passe plein écran porte aussi la teinte verte : elle tourne même sans pluie au premier plan.
             if (settings.screenRain.value || settings.sceneTint.value > 0f)
                 renderer.EnqueuePass(pass);
+
+            if (environmentActive)
+                renderer.EnqueuePass(environmentPass);
 
             if (surfaceActive)
             {
@@ -86,9 +131,15 @@ namespace MatrixVision.Rendering
         {
             CoreUtils.Destroy(material);
             CoreUtils.Destroy(surfaceMaterial);
+            CoreUtils.Destroy(environmentMaterial);
+            CoreUtils.Destroy(passthroughDimMaterial);
             material = null;
             surfaceMaterial = null;
+            environmentMaterial = null;
+            passthroughDimMaterial = null;
             pass = null;
+            environmentPass = null;
+            passthroughDimPass = null;
             surfacePass = null;
         }
 
@@ -114,11 +165,21 @@ namespace MatrixVision.Rendering
             public static readonly int SceneBrightness = Shader.PropertyToID("_MatrixSceneBrightness");
             public static readonly int HeadBrightness = Shader.PropertyToID("_MatrixHeadBrightness");
             public static readonly int TrailBrightness = Shader.PropertyToID("_MatrixTrailBrightness");
+            public static readonly int EnvDepthAvailable = Shader.PropertyToID("_MatrixEnvDepthAvailable");
+            public static readonly int EnvMaxDistance = Shader.PropertyToID("_MatrixEnvMaxDistance");
+            public static readonly int EnvCodeActive = Shader.PropertyToID("_MatrixEnvCodeActive");
+            public static readonly int EnvOcclusionEnabled = Shader.PropertyToID("_MatrixEnvOcclusionEnabled");
+            public static readonly int SkipSceneDepth = Shader.PropertyToID("_MatrixSkipSceneDepth");
+            public static readonly int PassthroughDim = Shader.PropertyToID("_MatrixPassthroughDim");
         }
 
-        // Paramètres partagés par les deux shaders (voir MatrixCommon.hlsl).
-        void PushGlobals(MatrixRain s, bool surfaceActive)
+        // Paramètres partagés par les shaders (voir MatrixCommon.hlsl et MatrixEnvironmentDepth.hlsl).
+        void PushGlobals(MatrixRain s, bool surfaceActive, bool environmentActive)
         {
+            Shader.SetGlobalFloat(Ids.EnvCodeActive, environmentActive ? 1f : 0f);
+            Shader.SetGlobalFloat(Ids.EnvOcclusionEnabled, s.occlusion.value ? 1f : 0f);
+            Shader.SetGlobalFloat(Ids.PassthroughDim, s.passthroughDim.value);
+            Shader.SetGlobalFloat(Ids.EnvMaxDistance, s.realWorldMaxDistance.value);
             Shader.SetGlobalFloat(Ids.ScreenRain, s.screenRain.value ? 1f : 0f);
             Shader.SetGlobalFloat(Ids.DepthLayers, s.screenDepthLayers.value ? 1f : 0f);
             Shader.SetGlobalFloat(Ids.SceneBrightness, s.sceneBrightness.value);
@@ -190,6 +251,74 @@ namespace MatrixVision.Rendering
             }
         }
 
+        /// <summary>
+        /// Code sur l'environnement réel (AR) : triangle plein écran additif, le shader MatrixEnvironment
+        /// replace chaque pixel dans le monde grâce à la profondeur publiée par MatrixARController.
+        /// </summary>
+        sealed class MatrixEnvironmentPass : ScriptableRenderPass
+        {
+            class PassData
+            {
+                public Material material;
+            }
+
+            readonly Material material;
+
+            public MatrixEnvironmentPass(Material material)
+            {
+                this.material = material;
+                profilingSampler = new ProfilingSampler("Matrix Environment");
+                requiresIntermediateTexture = true;
+            }
+
+            public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
+            {
+                var resourceData = frameData.Get<UniversalResourceData>();
+                if (resourceData.isActiveTargetBackBuffer)
+                    return;
+
+                using (var builder = renderGraph.AddRasterRenderPass<PassData>("Matrix Environment", out var data, profilingSampler))
+                {
+                    data.material = material;
+                    builder.SetRenderAttachment(resourceData.activeColorTexture, 0);
+                    builder.SetRenderFunc(static (PassData d, RasterGraphContext ctx) =>
+                        Blitter.BlitTexture(ctx.cmd, new Vector4(1f, 1f, 0f, 0f), d.material, 0));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Voile sombre teinté sur le passthrough d'un casque (Meta Quest) : triangle plein écran en alpha
+        /// prémultiplié, dessiné directement dans la cible de la caméra, sans rien y relire.
+        /// </summary>
+        sealed class MatrixPassthroughDimPass : ScriptableRenderPass
+        {
+            class PassData
+            {
+                public Material material;
+            }
+
+            readonly Material material;
+
+            public MatrixPassthroughDimPass(Material material)
+            {
+                this.material = material;
+                profilingSampler = new ProfilingSampler("Matrix Passthrough Dim");
+            }
+
+            public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
+            {
+                var resourceData = frameData.Get<UniversalResourceData>();
+                using (var builder = renderGraph.AddRasterRenderPass<PassData>("Matrix Passthrough Dim", out var data, profilingSampler))
+                {
+                    data.material = material;
+                    builder.SetRenderAttachment(resourceData.activeColorTexture, 0);
+                    builder.SetRenderFunc(static (PassData d, RasterGraphContext ctx) =>
+                        Blitter.BlitTexture(ctx.cmd, new Vector4(1f, 1f, 0f, 0f), d.material, 0));
+                }
+            }
+        }
+
         /// <summary>Code sur les objets : redessine les objets filtrés avec le shader MatrixSurface.</summary>
         sealed class MatrixSurfacePass : ScriptableRenderPass
         {
@@ -206,15 +335,19 @@ namespace MatrixVision.Rendering
             };
 
             readonly Material material;
+            readonly bool lightweight;
             int materialPass;
             uint renderingLayerMask;
 
-            public MatrixSurfacePass(Material material)
+            // lightweight : casque XR, dessin direct à l'écran, sans texture intermédiaire ni copie de profondeur.
+            public MatrixSurfacePass(Material material, bool lightweight)
             {
                 this.material = material;
+                this.lightweight = lightweight;
                 profilingSampler = new ProfilingSampler("Matrix Surface");
-                requiresIntermediateTexture = true;
-                ConfigureInput(ScriptableRenderPassInput.Depth);
+                requiresIntermediateTexture = !lightweight;
+                if (!lightweight)
+                    ConfigureInput(ScriptableRenderPassInput.Depth);
             }
 
             public void Setup(int materialPass, uint renderingLayerMask)
@@ -226,7 +359,7 @@ namespace MatrixVision.Rendering
             public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
             {
                 var resourceData = frameData.Get<UniversalResourceData>();
-                if (resourceData.isActiveTargetBackBuffer)
+                if (resourceData.isActiveTargetBackBuffer && !lightweight)
                     return;
 
                 var renderingData = frameData.Get<UniversalRenderingData>();
@@ -243,9 +376,11 @@ namespace MatrixVision.Rendering
                 {
                     data.rendererList = rendererList;
                     builder.UseRendererList(rendererList);
-                    if (resourceData.cameraDepthTexture.IsValid())
+                    if (!lightweight && resourceData.cameraDepthTexture.IsValid())
                         builder.UseTexture(resourceData.cameraDepthTexture);
                     builder.SetRenderAttachment(resourceData.activeColorTexture, 0);
+                    if (lightweight)
+                        builder.SetRenderAttachmentDepth(resourceData.activeDepthTexture, AccessFlags.Read);
                     builder.SetRenderFunc(static (PassData d, RasterGraphContext ctx) => ctx.cmd.DrawRendererList(d.rendererList));
                 }
             }
